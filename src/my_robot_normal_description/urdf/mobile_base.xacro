@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <xacro:property name="base_lenght" value="0.68"/>
+    <xacro:property name="base_width" value="0.38"/>
+    <xacro:property name="base_height" value="0.115"/>
+    <xacro:property name="wheel_radius" value="0.1"/>
+    <xacro:property name="wheel_length" value="0.05"/>
+
+    <link name="base_footprint"/>
+
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <box size="${base_lenght} ${base_width} ${base_height}" />
+            </geometry>
+            <origin xyz="0 0 ${base_height/2.0}" rpy="0 0 0" />
+            <material name="blue" />
+        </visual>
+        <collision>
+            <geometry>
+                <box size="${base_lenght} ${base_width} ${base_height}" />
+            </geometry>
+            <origin xyz="0 0 ${base_height/2.0}" rpy="0 0 0" />
+       </collision> 
+        <xacro:box_inertia m="5.0" x="${base_lenght}" y="${base_width}" z="${base_height}"
+                           o_xyz="0 0 ${base_height/2.0}" o_rpy="0 0 0" />
+    </link>
+    
+    <xacro:macro name="wheel_link" params="prefix0 prefix1">
+        <link name="${prefix0}_${prefix1}_wheel_link">
+            <visual>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_length}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
+                <material name="grey" />
+            </visual>
+            <collision>
+                <geometry>
+                    <sphere radius="${wheel_radius}" />
+                </geometry>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+            </collision>
+            <xacro:wheel_inertia m="1.0" r="${wheel_radius}" l="${wheel_length}"
+                           o_xyz="0 0 0" o_rpy="${pi / 2.0} 0 0" />
+        </link>
+    </xacro:macro>
+
+    <xacro:wheel_link prefix0="right" prefix1="back"/>
+    <xacro:wheel_link prefix0="left" prefix1="back"/>
+    <xacro:wheel_link prefix0="right" prefix1="front"/>
+    <xacro:wheel_link prefix0="left" prefix1="front"/>
+
+    <!-- <link name="caster_wheel_link">
+        <visual>
+            <geometry>
+                <sphere radius="${wheel_radius/2.0}" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <material name="grey" />
+        </visual>
+        <collision>
+            <geometry>
+                <sphere radius="${wheel_radius/2.0}" />
+            </geometry>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+        </collision>
+        <xacro:caster_wheel_inertia m="0.5" r="${wheel_radius/2.0}"
+                           o_xyz="0 0 0" o_rpy="0 0 0" />
+    </link> -->
+
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+    </joint>
+
+    <joint name="base_right_back_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="right_back_wheel_link"/>
+        <origin xyz="${-base_lenght / 2.5} ${-(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="100" velocity="10"/>
+        <gazebo>
+            <provideFeedback>true</provideFeedback>
+        </gazebo>
+    </joint>
+
+    <joint name="base_left_back_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="left_back_wheel_link"/>
+        <origin xyz="${-base_lenght / 2.5} ${(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="100" velocity="10"/>
+        <gazebo>
+            <provideFeedback>true</provideFeedback>
+        </gazebo>
+    </joint>
+
+    <joint name="base_right_front_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="right_front_wheel_link"/>
+        <origin xyz="${base_lenght / 2.5} ${-(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="100" velocity="10"/>
+        <gazebo>
+            <provideFeedback>true</provideFeedback>
+        </gazebo>
+    </joint>
+
+    <joint name="base_left_front_wheel_joint" type="continuous">
+        <parent link="base_link" />
+        <child link="left_front_wheel_link"/>
+        <origin xyz="${base_lenght / 2.5} ${(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <axis xyz="0 1 0"/>
+        <limit effort="100" velocity="10"/>
+        <gazebo>
+            <provideFeedback>true</provideFeedback>
+        </gazebo>
+    </joint>
+      
+    
+</robot>

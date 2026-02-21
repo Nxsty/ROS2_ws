@@ -1,0 +1,27 @@
+# ROS2 colcon build folders
+build/
+install/
+log/
+
+# IDE files
+.vscode/
+.idea/
+.project
+.pydevproject
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Zip files and archives
+src/goldencode21022026.zip
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/

@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <gazebo reference="right_back">
+        <mu1 value="0.1"/>
+        <mu2 value="0.1"/>
+    </gazebo>
+
+    <gazebo reference="left_back">
+        <mu1 value="0.1"/>
+        <mu2 value="0.1"/>
+    </gazebo>
+
+    <gazebo reference="right_front">
+        <mu1 value="0.1"/>
+        <mu2 value="0.1"/>
+    </gazebo>
+
+    <gazebo reference="left_front">
+        <mu1 value="0.1"/>
+        <mu2 value="0.1"/>
+    </gazebo>
+
+    <gazebo>
+        <plugin
+            filename="gz-sim-joint-controller-system"
+            name="gz::sim::systems::JointController">
+            <joint_name>rim_left_front_joint</joint_name>
+            <topic>/rim_left_front_joint/cmd_vel</topic>
+        </plugin>
+    </gazebo>
+
+    <gazebo>
+        <plugin
+            filename="gz-sim-joint-controller-system"
+            name="gz::sim::systems::JointController">
+            <joint_name>rim_right_front_joint</joint_name>
+            <topic>/rim_right_front_joint/cmd_vel</topic>
+        </plugin>
+    </gazebo>
+
+    <gazebo>
+        <plugin
+            filename="gz-sim-joint-controller-system"
+            name="gz::sim::systems::JointController">
+            <joint_name>rim_left_back_joint</joint_name>
+            <topic>/rim_left_back_joint/cmd_vel</topic>
+        </plugin>
+    </gazebo>
+
+    <gazebo>
+        <plugin
+            filename="gz-sim-joint-controller-system"
+            name="gz::sim::systems::JointController">
+            <joint_name>rim_right_back_joint</joint_name>
+            <topic>/rim_right_back_joint/cmd_vel</topic>
+        </plugin>
+    </gazebo>
+    <gazebo>
+        <plugin
+            filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+        <joint_name>rim_left_front_joint</joint_name>
+        <joint_name>rim_right_front_joint</joint_name>
+        <joint_name>rim_left_back_joint</joint_name>
+        <joint_name>rim_right_back_joint</joint_name>
+        <joint_name>roller_upfront_rim_right_back_joint</joint_name>
+        <joint_name>roller_rightupfront_rim_right_back_joint</joint_name>
+        <joint_name>roller_leftupfront_rim_right_back_joint</joint_name>
+        <joint_name>roller_rightdownfront_rim_right_back_joint</joint_name>
+        <joint_name>roller_lefttdownfront_rim_right_back_joint</joint_name>
+        <joint_name>roller_upback_rim_right_back_joint</joint_name>
+        <joint_name>roller_rightupback_rim_right_back_joint</joint_name>
+        <joint_name>roller_leftupback_rim_right_back_joint</joint_name>
+        <joint_name>roller_rightdownback_rim_right_back_joint</joint_name>
+        <joint_name>roller_lefttdownback_rim_right_back_joint</joint_name>
+        <joint_name>roller_upfront_rim_left_back_joint</joint_name>
+        <joint_name>roller_rightupfront_rim_left_back_joint</joint_name>
+        <joint_name>roller_leftupfront_rim_left_back_joint</joint_name>
+        <joint_name>roller_rightdownfront_rim_left_back_joint</joint_name>
+        <joint_name>roller_lefttdownfront_rim_left_back_joint</joint_name>
+        <joint_name>roller_upback_rim_left_back_joint</joint_name>
+        <joint_name>roller_rightupback_rim_left_back_joint</joint_name>
+        <joint_name>roller_leftupback_rim_left_back_joint</joint_name>
+        <joint_name>roller_rightdownback_rim_left_back_joint</joint_name>
+        <joint_name>roller_lefttdownback_rim_left_back_joint</joint_name>
+        <joint_name>roller_upfront_rim_right_front_joint</joint_name>
+        <joint_name>roller_rightupfront_rim_right_front_joint</joint_name>
+        <joint_name>roller_leftupfront_rim_right_front_joint</joint_name>
+        <joint_name>roller_rightdownfront_rim_right_front_joint</joint_name>
+        <joint_name>roller_lefttdownfront_rim_right_front_joint</joint_name>
+        <joint_name>roller_upback_rim_right_front_joint</joint_name>
+        <joint_name>roller_rightupback_rim_right_front_joint</joint_name>
+        <joint_name>roller_leftupback_rim_right_front_joint</joint_name>
+        <joint_name>roller_rightdownback_rim_right_front_joint</joint_name>
+        <joint_name>roller_lefttdownback_rim_right_front_joint</joint_name>
+        <joint_name>roller_upfront_rim_left_front_joint</joint_name>
+        <joint_name>roller_rightupfront_rim_left_front_joint</joint_name>
+        <joint_name>roller_leftupfront_rim_left_front_joint</joint_name>
+        <joint_name>roller_rightdownfront_rim_left_front_joint</joint_name>
+        <joint_name>roller_lefttdownfront_rim_left_front_joint</joint_name>
+        <joint_name>roller_upback_rim_left_front_joint</joint_name>
+        <joint_name>roller_rightupback_rim_left_front_joint</joint_name>
+        <joint_name>roller_leftupback_rim_left_front_joint</joint_name>
+        <joint_name>roller_rightdownback_rim_left_front_joint</joint_name>
+        <joint_name>roller_lefttdownback_rim_left_front_joint</joint_name>
+      </plugin>
+    </gazebo>
+</robot>
