@@ -19,11 +19,12 @@
         </visual>
         <collision>
             <geometry>
-                <box size="${base_lenght} ${base_width} ${base_height}" />
+                <!-- Narrower collision box to avoid any physical contact with the wheels -->
+                <box size="${base_lenght*0.9} ${base_width*0.8} ${base_height*0.8}" />
             </geometry>
             <origin xyz="0 0 ${base_height/2.0}" rpy="0 0 0" />
        </collision> 
-        <xacro:box_inertia m="5.0" x="${base_lenght}" y="${base_width}" z="${base_height}"
+        <xacro:box_inertia m="50.0" x="${base_lenght}" y="${base_width}" z="${base_height}"
                            o_xyz="0 0 ${base_height/2.0}" o_rpy="0 0 0" />
     </link>
     
@@ -38,11 +39,12 @@
             </visual>
             <collision>
                 <geometry>
+                    <!-- IMPORTANT: Use sphere for collision in Gazebo for better steering -->
                     <sphere radius="${wheel_radius}" />
                 </geometry>
                 <origin xyz="0 0 0" rpy="0 0 0" />
             </collision>
-            <xacro:wheel_inertia m="1.0" r="${wheel_radius}" l="${wheel_length}"
+            <xacro:wheel_inertia m="3.0" r="${wheel_radius}" l="${wheel_length}"
                            o_xyz="0 0 0" o_rpy="${pi / 2.0} 0 0" />
         </link>
     </xacro:macro>
@@ -79,9 +81,10 @@
     <joint name="base_right_back_wheel_joint" type="continuous">
         <parent link="base_link" />
         <child link="right_back_wheel_link"/>
-        <origin xyz="${-base_lenght / 2.5} ${-(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <origin xyz="${-base_lenght / 2.5} ${-(base_width+wheel_length)/2.0 - 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="100" velocity="10"/>
+        <limit effort="10000" velocity="10"/>
+        <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>
         </gazebo>
@@ -90,9 +93,10 @@
     <joint name="base_left_back_wheel_joint" type="continuous">
         <parent link="base_link" />
         <child link="left_back_wheel_link"/>
-        <origin xyz="${-base_lenght / 2.5} ${(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <origin xyz="${-base_lenght / 2.5} ${(base_width+wheel_length)/2.0 + 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="100" velocity="10"/>
+        <limit effort="10000" velocity="10"/>
+        <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>
         </gazebo>
@@ -101,9 +105,10 @@
     <joint name="base_right_front_wheel_joint" type="continuous">
         <parent link="base_link" />
         <child link="right_front_wheel_link"/>
-        <origin xyz="${base_lenght / 2.5} ${-(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <origin xyz="${base_lenght / 2.5} ${-(base_width+wheel_length)/2.0 - 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="100" velocity="10"/>
+        <limit effort="10000" velocity="10"/>
+        <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>
         </gazebo>
@@ -112,9 +117,10 @@
     <joint name="base_left_front_wheel_joint" type="continuous">
         <parent link="base_link" />
         <child link="left_front_wheel_link"/>
-        <origin xyz="${base_lenght / 2.5} ${(base_width+wheel_length)/2.0} 0" rpy="0 0 0"/>
+        <origin xyz="${base_lenght / 2.5} ${(base_width+wheel_length)/2.0 + 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="100" velocity="10"/>
+        <limit effort="10000" velocity="10"/>
+        <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>
         </gazebo>

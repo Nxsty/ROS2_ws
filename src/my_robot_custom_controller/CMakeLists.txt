@@ -10,6 +10,9 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -24,21 +27,41 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(diff_drive_controller src/diff_drive_controller.cpp)
+add_executable(pose_controller src/pose_controller.cpp)
 
 ament_target_dependencies(diff_drive_controller
   rclcpp
   geometry_msgs
   sensor_msgs
+  nav_msgs
+  std_msgs
+  tf2_ros
+)
+
+ament_target_dependencies(pose_controller
+  rclcpp
+  geometry_msgs
+  nav_msgs
+  tf2_ros
 )
 
 install(TARGETS
   diff_drive_controller
+  pose_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY
   launch
+  scripts
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  scripts/world_oriented_teleop.py
+  scripts/maze_rviz_visualizer.py
+  scripts/generate_h5_dataset.py
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()

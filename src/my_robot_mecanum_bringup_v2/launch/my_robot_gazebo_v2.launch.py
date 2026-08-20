@@ -84,12 +84,17 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'wheel_radius': 0.029,
-            'wheel_separation_x': 0.224,
-            'wheel_separation_y': 0.275,
+            'wheel_separation_x': 0.112,
+            'wheel_separation_y': 0.1375,
+            'fl_wheel_joint': 'rim_left_front_joint',
+            'fr_wheel_joint': 'rim_right_front_joint',
+            'bl_wheel_joint': 'rim_left_back_joint',
+            'br_wheel_joint': 'rim_right_back_joint',
             'fl_wheel_topic': '/rim_left_front_joint/cmd_vel',
             'fr_wheel_topic': '/rim_right_front_joint/cmd_vel',
             'bl_wheel_topic': '/rim_left_back_joint/cmd_vel',
-            'br_wheel_topic': '/rim_right_back_joint/cmd_vel'
+            'br_wheel_topic': '/rim_right_back_joint/cmd_vel',
+            'base_frame': 'base_footprint'
         }]
     )
 

@@ -1,65 +1,43 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-    <gazebo reference="base_left_back_wheel_link">
-        <mu1 value="0.1"/>
-        <mu2 value="0.1"/>
-    </gazebo>
+    <xacro:macro name="wheel_gazebo" params="reference">
+        <gazebo reference="${reference}">
+            <mu1 value="1.0"/>
+            <!-- mu2 en 0.6 para que el giro sea pesado y no patine -->
+            <mu2 value="0.6"/>
+            <kp value="1000000.0" />
+            <kd value="100.0" />
+            <fdir1 value="1 0 0"/>
+        </gazebo>
+    </xacro:macro>
 
-    <gazebo reference="base_right_back_wheel_link">
-        <mu1 value="0.1"/>
-        <mu2 value="0.1"/>
-    </gazebo>
+    <xacro:wheel_gazebo reference="left_back_wheel_link"/>
+    <xacro:wheel_gazebo reference="right_back_wheel_link"/>
+    <xacro:wheel_gazebo reference="left_front_wheel_link"/>
+    <xacro:wheel_gazebo reference="right_front_wheel_link"/>
 
-    <gazebo reference="base_left_front_wheel_link">
-        <mu1 value="0.1"/>
-        <mu2 value="0.1"/>
-    </gazebo>
+    <xacro:macro name="joint_ctrl" params="joint_name topic">
+        <gazebo>
+            <plugin
+                filename="gz-sim-joint-controller-system"
+                name="gz::sim::systems::JointController">
+                <joint_name>${joint_name}</joint_name>
+                <topic>${topic}</topic>
+                <!-- PID afinado para mover 50kg con suavidad y precisión -->
+                <p_gain>1000.0</p_gain>
+                <i_gain>0.0</i_gain>
+                <d_gain>300.0</d_gain>
+                <max_force>600.0</max_force>
+            </plugin>
+        </gazebo>
+    </xacro:macro>
 
-    <gazebo reference="base_right_front_wheel_link">
-        <mu1 value="0.1"/>
-        <mu2 value="0.1"/>
-    </gazebo>
-
-    <gazebo>
-        <plugin
-            filename="gz-sim-joint-controller-system"
-            name="gz::sim::systems::JointController">
-            <joint_name>base_left_front_wheel_joint</joint_name>
-            <topic>/base_left_front_wheel_joint/cmd_vel</topic>
-        </plugin>
-    </gazebo>
-
-    <gazebo>
-        <plugin
-            filename="gz-sim-joint-controller-system"
-            name="gz::sim::systems::JointController">
-            <joint_name>base_right_front_wheel_joint</joint_name>
-            <topic>/base_right_front_wheel_joint/cmd_vel</topic>
-        </plugin>
-    </gazebo>
-
-    <gazebo>
-        <plugin
-            filename="gz-sim-joint-controller-system"
-            name="gz::sim::systems::JointController">
-            <joint_name>base_left_back_wheel_joint</joint_name>
-            <topic>/base_left_back_wheel_joint/cmd_vel</topic>
-        </plugin>
-    </gazebo>
-
-    <gazebo>
-        <plugin
-            filename="gz-sim-joint-controller-system"
-            name="gz::sim::systems::JointController">
-            <joint_name>base_right_back_wheel_joint</joint_name>
-            <topic>/base_right_back_wheel_joint/cmd_vel</topic>
-        </plugin>
-    </gazebo>
+    <xacro:joint_ctrl joint_name="base_left_front_wheel_joint" topic="/base_left_front_wheel_joint/cmd_vel"/>
+    <xacro:joint_ctrl joint_name="base_right_front_wheel_joint" topic="/base_right_front_wheel_joint/cmd_vel"/>
+    <xacro:joint_ctrl joint_name="base_left_back_wheel_joint" topic="/base_left_back_wheel_joint/cmd_vel"/>
+    <xacro:joint_ctrl joint_name="base_right_back_wheel_joint" topic="/base_right_back_wheel_joint/cmd_vel"/>
       
-
-
-
     <gazebo>
         <plugin
             filename="gz-sim-joint-state-publisher-system"
@@ -72,5 +50,5 @@
             <joint_name>base_right_front_wheel_joint</joint_name>
         </plugin>
     </gazebo>
-    
+
 </robot>
