@@ -38,6 +38,8 @@ public:
         this->declare_parameter<std::string>("right_back_wheel_topic", "/base_right_back_wheel_joint/cmd_vel");
         this->declare_parameter<std::string>("odom_frame", "odom");
         this->declare_parameter<std::string>("base_frame", "base_footprint");
+        this->declare_parameter<bool>("publish_odom", true);
+        this->declare_parameter<bool>("publish_tf", true);
 
         this->get_parameter("wheel_radius", wheel_radius_);
         this->get_parameter("wheel_separation", wheel_separation_);
@@ -47,6 +49,8 @@ public:
         this->get_parameter("right_back_wheel_joint", rb_joint_);
         this->get_parameter("odom_frame", odom_frame_);
         this->get_parameter("base_frame", base_frame_);
+        this->get_parameter("publish_odom", publish_odom_);
+        this->get_parameter("publish_tf", publish_tf_);
 
         // --- Suscripciones ---
         cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
@@ -137,49 +141,53 @@ private:
                 q.setRPY(0, 0, pose_theta_);
 
                 // Publicar TF (Odom -> Base Footprint)
-                geometry_msgs::msg::TransformStamped t;
-                t.header.stamp = current_time;
-                t.header.frame_id = odom_frame_;
-                t.child_frame_id = base_frame_;
-                t.transform.translation.x = pose_x_;
-                t.transform.translation.y = pose_y_;
-                t.transform.translation.z = 0.0;
-                t.transform.rotation.x = q.x();
-                t.transform.rotation.y = q.y();
-                t.transform.rotation.z = q.z();
-                t.transform.rotation.w = q.w();
-                tf_broadcaster_->sendTransform(t);
+                if (publish_tf_) {
+                    geometry_msgs::msg::TransformStamped t;
+                    t.header.stamp = current_time;
+                    t.header.frame_id = odom_frame_;
+                    t.child_frame_id = base_frame_;
+                    t.transform.translation.x = pose_x_;
+                    t.transform.translation.y = pose_y_;
+                    t.transform.translation.z = 0.0;
+                    t.transform.rotation.x = q.x();
+                    t.transform.rotation.y = q.y();
+                    t.transform.rotation.z = q.z();
+                    t.transform.rotation.w = q.w();
+                    tf_broadcaster_->sendTransform(t);
+                }
 
                 // Publicar Mensaje Odometry
-                nav_msgs::msg::Odometry odom;
-                odom.header.stamp = current_time;
-                odom.header.frame_id = odom_frame_;
-                odom.child_frame_id = base_frame_;
-                
-                // Pose
-                odom.pose.pose.position.x = pose_x_;
-                odom.pose.pose.position.y = pose_y_;
-                odom.pose.pose.position.z = 0.0;
-                odom.pose.pose.orientation.x = q.x();
-                odom.pose.pose.orientation.y = q.y();
-                odom.pose.pose.orientation.z = q.z();
-                odom.pose.pose.orientation.w = q.w();
+                if (publish_odom_) {
+                    nav_msgs::msg::Odometry odom;
+                    odom.header.stamp = current_time;
+                    odom.header.frame_id = odom_frame_;
+                    odom.child_frame_id = base_frame_;
+                    
+                    // Pose
+                    odom.pose.pose.position.x = pose_x_;
+                    odom.pose.pose.position.y = pose_y_;
+                    odom.pose.pose.position.z = 0.0;
+                    odom.pose.pose.orientation.x = q.x();
+                    odom.pose.pose.orientation.y = q.y();
+                    odom.pose.pose.orientation.z = q.z();
+                    odom.pose.pose.orientation.w = q.w();
 
-                // Añadir Covarianzas (Incertidumbre) - Obligatorio para Tarea 1.2
-                // Pose Covariance
-                odom.pose.covariance[0]  = 0.001; // x
-                odom.pose.covariance[7]  = 0.001; // y
-                odom.pose.covariance[35] = 0.001; // yaw
-                
-                // Twist (Velocidad en el frame local base_link)
-                odom.twist.twist.linear.x = vx;
-                odom.twist.twist.angular.z = wz;
-                
-                // Twist Covariance
-                odom.twist.covariance[0]  = 0.001; // vx
-                odom.twist.covariance[35] = 0.001; // wz
+                    // Añadir Covarianzas (Incertidumbre) - Obligatorio para Tarea 1.2
+                    // Pose Covariance
+                    odom.pose.covariance[0]  = 0.001; // x
+                    odom.pose.covariance[7]  = 0.001; // y
+                    odom.pose.covariance[35] = 0.001; // yaw
+                    
+                    // Twist (Velocidad en el frame local base_link)
+                    odom.twist.twist.linear.x = vx;
+                    odom.twist.twist.angular.z = wz;
+                    
+                    // Twist Covariance
+                    odom.twist.covariance[0]  = 0.001; // vx
+                    odom.twist.covariance[35] = 0.001; // wz
 
-                odom_pub_->publish(odom);
+                    odom_pub_->publish(odom);
+                }
             }
         }
     }
@@ -227,6 +235,8 @@ private:
     double wheel_radius_, wheel_separation_;
     std::string lf_joint_, lb_joint_, rf_joint_, rb_joint_;
     std::string odom_frame_, base_frame_;
+    bool publish_odom_ = true;
+    bool publish_tf_ = true;
 };
 
 int main(int argc, char *argv[])

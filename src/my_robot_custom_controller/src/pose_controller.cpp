@@ -17,9 +17,9 @@ public:
     : Node("pose_controller")
     {
         // --- Parámetros de Control (Ganancias) ---
-        this->declare_parameter<double>("kp_linear", 1.2);
-        this->declare_parameter<double>("kp_angular", 3.0);
-        this->declare_parameter<double>("dist_tolerance", 0.05);
+        this->declare_parameter<double>("kp_linear", 1.0);
+        this->declare_parameter<double>("kp_angular", 1.8);
+        this->declare_parameter<double>("dist_tolerance", 0.15);
 
         // --- Suscripciones ---
         goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
@@ -89,8 +89,8 @@ private:
         auto cmd = geometry_msgs::msg::Twist();
 
         if (distance_error > this->get_parameter("dist_tolerance").as_double()) {
-            // Si el ángulo es muy grande, primero girar sobre el sitio
-            if (std::abs(angle_error) > 0.5) {
+            // Si el ángulo es muy grande, primero girar sobre el sitio suavemente
+            if (std::abs(angle_error) > 0.4) {
                 cmd.linear.x = 0.0;
                 cmd.angular.z = this->get_parameter("kp_angular").as_double() * angle_error;
             } else {
@@ -99,10 +99,10 @@ private:
                 cmd.angular.z = this->get_parameter("kp_angular").as_double() * angle_error;
             }
             
-            // Limitar velocidades máximas para seguridad
-            if (cmd.linear.x > 1.5) cmd.linear.x = 1.5;
-            if (cmd.angular.z > 1.5) cmd.angular.z = 1.5;
-            if (cmd.angular.z < -1.5) cmd.angular.z = -1.5;
+            // Limitar velocidades máximas para estabilidad visual
+            if (cmd.linear.x > 0.8) cmd.linear.x = 0.8;
+            if (cmd.angular.z > 0.8) cmd.angular.z = 0.8;
+            if (cmd.angular.z < -0.8) cmd.angular.z = -0.8;
 
         } else {
             // Objetivo alcanzado

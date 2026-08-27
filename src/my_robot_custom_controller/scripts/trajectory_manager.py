@@ -15,11 +15,11 @@ class TrajectoryManager(Node):
         self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         
         self.waypoints = [
-            (2.0, 0.0),
-            (2.0, 2.0),
-            (0.0, 2.0),
-            (-1.0, 1.0),
-            (1.0, -1.0),
+            (5.0, 0.0),
+            (5.0, 5.0),
+            (0.0, 5.0),
+            (-3.0, 2.0),
+            (2.0, -3.0),
             (0.0, 0.0)
         ]
         

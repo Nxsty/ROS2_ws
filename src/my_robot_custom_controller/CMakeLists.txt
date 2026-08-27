@@ -61,6 +61,8 @@ install(PROGRAMS
   scripts/world_oriented_teleop.py
   scripts/maze_rviz_visualizer.py
   scripts/generate_h5_dataset.py
+  scripts/vio_odometry.py
+  scripts/trajectory_manager.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
