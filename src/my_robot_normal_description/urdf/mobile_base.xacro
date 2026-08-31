@@ -83,7 +83,7 @@
         <child link="right_back_wheel_link"/>
         <origin xyz="${-base_lenght / 2.5} ${-(base_width+wheel_length)/2.0 - 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="10"/>
+        <limit effort="10000" velocity="30"/>
         <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>
@@ -95,7 +95,7 @@
         <child link="left_back_wheel_link"/>
         <origin xyz="${-base_lenght / 2.5} ${(base_width+wheel_length)/2.0 + 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="10"/>
+        <limit effort="10000" velocity="30"/>
         <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>
@@ -107,7 +107,7 @@
         <child link="right_front_wheel_link"/>
         <origin xyz="${base_lenght / 2.5} ${-(base_width+wheel_length)/2.0 - 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="10"/>
+        <limit effort="10000" velocity="30"/>
         <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>
@@ -119,7 +119,7 @@
         <child link="left_front_wheel_link"/>
         <origin xyz="${base_lenght / 2.5} ${(base_width+wheel_length)/2.0 + 0.01} 0" rpy="0 0 0"/>
         <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="10"/>
+        <limit effort="10000" velocity="30"/>
         <dynamics damping="0.1" friction="0.1"/>
         <gazebo>
             <provideFeedback>true</provideFeedback>

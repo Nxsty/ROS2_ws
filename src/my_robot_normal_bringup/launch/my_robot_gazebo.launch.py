@@ -19,7 +19,7 @@ def generate_launch_description():
 
     world_arg = DeclareLaunchArgument(
         'world',
-        default_value='open_textured_world.sdf',
+        default_value='warehouse_world.sdf',
         description='World file name under worlds/'
     )
     world = LaunchConfiguration('world')
@@ -162,6 +162,7 @@ def generate_launch_description():
         parameters=[{
             'odom_frame': 'odom',
             'base_frame': 'base_footprint',
+            'camera_height': 0.1575,
             'publish_tf': True,
             'use_sim_time': True
         }]

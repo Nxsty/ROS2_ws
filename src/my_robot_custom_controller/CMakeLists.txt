@@ -63,6 +63,7 @@ install(PROGRAMS
   scripts/generate_h5_dataset.py
   scripts/vio_odometry.py
   scripts/trajectory_manager.py
+  scripts/plot_trajectories.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -1,14 +1,14 @@
+#include <memory>
+#include <chrono>
+#include <cmath>
+#include <algorithm>
 
 #include "rclcpp/rclcpp.hpp"
+#include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
-#include "geometry_msgs/msg/twist.hpp"
-#include "tf2/utils.h"
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Matrix3x3.h>
-
-#include <memory>
-#include <cmath>
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Matrix3x3.h"
 
 class PoseController : public rclcpp::Node
 {
@@ -16,12 +16,14 @@ public:
     PoseController()
     : Node("pose_controller")
     {
-        // --- Parámetros de Control (Ganancias) ---
-        this->declare_parameter<double>("kp_linear", 1.0);
-        this->declare_parameter<double>("kp_angular", 1.8);
-        this->declare_parameter<double>("dist_tolerance", 0.15);
+        // --- Parameters ---
+        this->declare_parameter<double>("kp_linear", 1.2);
+        this->declare_parameter<double>("kp_angular", 2.2);
+        this->declare_parameter<double>("dist_tolerance", 0.35);
+        this->declare_parameter<double>("max_linear_vel", 1.20);
+        this->declare_parameter<double>("max_angular_vel", 1.50);
 
-        // --- Suscripciones ---
+        // --- Subscriptions ---
         goal_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
             "/goal_pose", 10,
             std::bind(&PoseController::goal_callback, this, std::placeholders::_1));
@@ -30,10 +32,10 @@ public:
             "/odom", 10,
             std::bind(&PoseController::odom_callback, this, std::placeholders::_1));
 
-        // --- Publicadores ---
+        // --- Publishers ---
         cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
 
-        RCLCPP_INFO(this->get_logger(), "Pose Controller (Tasks 2.2 & 2.3) Started.");
+        RCLCPP_INFO(this->get_logger(), "Pose Controller Initialized (Smooth Continuous Unicycle Control).");
     }
 
 private:
@@ -41,7 +43,7 @@ private:
     {
         goal_pose_ = *msg;
         has_goal_ = true;
-        RCLCPP_INFO(this->get_logger(), "Moving to: x=%.2f, y=%.2f", 
+        RCLCPP_INFO(this->get_logger(), "🎯 New Target Received: x=%.2f, y=%.2f", 
                     msg->pose.position.x, msg->pose.position.y);
     }
 
@@ -50,14 +52,22 @@ private:
         current_odom_ = *msg;
         has_odom_ = true;
         
-        if (has_goal_) {
-            compute_control_law();
-        }
+        compute_control_law();
     }
 
     void compute_control_law()
     {
-        // 1. Obtener posición actual
+        auto cmd = geometry_msgs::msg::Twist();
+
+        if (!has_goal_) {
+            // Stop robot when no active goal
+            cmd.linear.x = 0.0;
+            cmd.angular.z = 0.0;
+            cmd_vel_pub_->publish(cmd);
+            return;
+        }
+
+        // 1. Current pose
         double curr_x = current_odom_.pose.pose.position.x;
         double curr_y = current_odom_.pose.pose.position.y;
         
@@ -69,44 +79,48 @@ private:
         double roll, pitch, yaw;
         tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
 
-        // 2. Obtener posición objetivo
+        // 2. Goal position
         double goal_x = goal_pose_.pose.position.x;
         double goal_y = goal_pose_.pose.position.y;
 
-        // --- Tarea 2.2: Cálculo de Error ---
+        // 3. Error computation
         double dx = goal_x - curr_x;
         double dy = goal_y - curr_y;
         double distance_error = std::sqrt(dx*dx + dy*dy);
         
-        // Ángulo hacia el objetivo
         double angle_to_goal = std::atan2(dy, dx);
         double angle_error = angle_to_goal - yaw;
-
-        // Normalizar ángulo (-pi a pi)
+        // Normalize angle to [-pi, pi]
         angle_error = std::atan2(std::sin(angle_error), std::cos(angle_error));
 
-        // --- Tarea 2.3: Ley de Control (P) ---
-        auto cmd = geometry_msgs::msg::Twist();
+        double dist_tol = this->get_parameter("dist_tolerance").as_double();
+        double kp_lin = this->get_parameter("kp_linear").as_double();
+        double kp_ang = this->get_parameter("kp_angular").as_double();
+        double max_v = this->get_parameter("max_linear_vel").as_double();
+        double max_w = this->get_parameter("max_angular_vel").as_double();
 
-        if (distance_error > this->get_parameter("dist_tolerance").as_double()) {
-            // Si el ángulo es muy grande, primero girar sobre el sitio suavemente
-            if (std::abs(angle_error) > 0.4) {
+        if (distance_error > dist_tol) {
+            // Phase 1: In-place turn if heading deviates by more than ~15 degrees (0.26 rad)
+            if (std::abs(angle_error) > 0.26) {
                 cmd.linear.x = 0.0;
-                cmd.angular.z = this->get_parameter("kp_angular").as_double() * angle_error;
+                double wz = kp_ang * angle_error;
+                cmd.angular.z = std::clamp(wz, -max_w, max_w);
             } else {
-                // Si está más o menos alineado, avanzar y corregir rumbo
-                cmd.linear.x = this->get_parameter("kp_linear").as_double() * distance_error;
-                cmd.angular.z = this->get_parameter("kp_angular").as_double() * angle_error;
-            }
-            
-            // Limitar velocidades máximas para estabilidad visual
-            if (cmd.linear.x > 0.8) cmd.linear.x = 0.8;
-            if (cmd.angular.z > 0.8) cmd.angular.z = 0.8;
-            if (cmd.angular.z < -0.8) cmd.angular.z = -0.8;
+                // Phase 2: Drive straight towards waypoint with gentle heading tracking
+                // Smooth deceleration profile as it approaches target
+                double v_scaled = kp_lin * (distance_error - 0.15);
+                double align_factor = std::max(0.0, std::cos(angle_error));
+                double vx = v_scaled * align_factor;
+                cmd.linear.x = std::clamp(vx, 0.0, max_v);
 
+                // Micro-corrections of heading while driving
+                double wz = 1.5 * angle_error;
+                cmd.angular.z = std::clamp(wz, -0.40, 0.40);
+            }
         } else {
-            // Objetivo alcanzado
-            RCLCPP_INFO(this->get_logger(), "Goal Reached!");
+            // Target reached!
+            RCLCPP_INFO(this->get_logger(), "✅ Target Reached (error: %.2fm <= %.2fm). Holding position.",
+                        distance_error, dist_tol);
             has_goal_ = false;
             cmd.linear.x = 0.0;
             cmd.angular.z = 0.0;
@@ -125,7 +139,7 @@ private:
     bool has_odom_ = false;
 };
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<PoseController>();

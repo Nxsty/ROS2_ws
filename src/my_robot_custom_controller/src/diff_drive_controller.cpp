@@ -101,10 +101,10 @@ private:
         bool f_lf=false, f_lb=false, f_rf=false, f_rb=false;
 
         for (size_t i = 0; i < msg->name.size(); ++i) {
-            if (msg->name[i] == lf_joint_) { w_lf = msg->velocity[i]; f_lf = true; }
-            else if (msg->name[i] == lb_joint_) { w_lb = msg->velocity[i]; f_lb = true; }
-            else if (msg->name[i] == rf_joint_) { w_rf = msg->velocity[i]; f_rf = true; }
-            else if (msg->name[i] == rb_joint_) { w_rb = msg->velocity[i]; f_rb = true; }
+            if (msg->name[i].find(lf_joint_) != std::string::npos && msg->velocity.size() > i) { w_lf = msg->velocity[i]; f_lf = true; }
+            else if (msg->name[i].find(lb_joint_) != std::string::npos && msg->velocity.size() > i) { w_lb = msg->velocity[i]; f_lb = true; }
+            else if (msg->name[i].find(rf_joint_) != std::string::npos && msg->velocity.size() > i) { w_rf = msg->velocity[i]; f_rf = true; }
+            else if (msg->name[i].find(rb_joint_) != std::string::npos && msg->velocity.size() > i) { w_rb = msg->velocity[i]; f_rb = true; }
         }
 
         if (f_lf && f_lb && f_rf && f_rb) {
