@@ -124,69 +124,71 @@ private:
             measured_vel_pub_->publish(m_vel);
 
             // --- Tarea 1.2: Dead-reckoning (Odometer Integration) ---
-            rclcpp::Time current_time = this->now();
-            double dt = (current_time - last_odom_time_).seconds();
-            last_odom_time_ = current_time;
+            if (publish_odom_ || publish_tf_) {
+                rclcpp::Time current_time = this->now();
+                double dt = (current_time - last_odom_time_).seconds();
+                last_odom_time_ = current_time;
 
-            if (dt > 0.0) {
-                // Integración de Pose (Euler)
-                pose_x_ += vx * std::cos(pose_theta_) * dt;
-                pose_y_ += vx * std::sin(pose_theta_) * dt;
-                pose_theta_ += wz * dt;
+                if (dt > 0.0) {
+                    // Integración de Pose (Euler)
+                    pose_x_ += vx * std::cos(pose_theta_) * dt;
+                    pose_y_ += vx * std::sin(pose_theta_) * dt;
+                    pose_theta_ += wz * dt;
 
-                // Normalización de ángulo (-pi a pi)
-                pose_theta_ = atan2(sin(pose_theta_), cos(pose_theta_));
+                    // Normalización de ángulo (-pi a pi)
+                    pose_theta_ = atan2(sin(pose_theta_), cos(pose_theta_));
 
-                tf2::Quaternion q;
-                q.setRPY(0, 0, pose_theta_);
+                    tf2::Quaternion q;
+                    q.setRPY(0, 0, pose_theta_);
 
-                // Publicar TF (Odom -> Base Footprint)
-                if (publish_tf_) {
-                    geometry_msgs::msg::TransformStamped t;
-                    t.header.stamp = current_time;
-                    t.header.frame_id = odom_frame_;
-                    t.child_frame_id = base_frame_;
-                    t.transform.translation.x = pose_x_;
-                    t.transform.translation.y = pose_y_;
-                    t.transform.translation.z = 0.0;
-                    t.transform.rotation.x = q.x();
-                    t.transform.rotation.y = q.y();
-                    t.transform.rotation.z = q.z();
-                    t.transform.rotation.w = q.w();
-                    tf_broadcaster_->sendTransform(t);
-                }
+                    // Publicar TF (Odom -> Base Footprint)
+                    if (publish_tf_) {
+                        geometry_msgs::msg::TransformStamped t;
+                        t.header.stamp = current_time;
+                        t.header.frame_id = odom_frame_;
+                        t.child_frame_id = base_frame_;
+                        t.transform.translation.x = pose_x_;
+                        t.transform.translation.y = pose_y_;
+                        t.transform.translation.z = 0.0;
+                        t.transform.rotation.x = q.x();
+                        t.transform.rotation.y = q.y();
+                        t.transform.rotation.z = q.z();
+                        t.transform.rotation.w = q.w();
+                        tf_broadcaster_->sendTransform(t);
+                    }
 
-                // Publicar Mensaje Odometry
-                if (publish_odom_) {
-                    nav_msgs::msg::Odometry odom;
-                    odom.header.stamp = current_time;
-                    odom.header.frame_id = odom_frame_;
-                    odom.child_frame_id = base_frame_;
-                    
-                    // Pose
-                    odom.pose.pose.position.x = pose_x_;
-                    odom.pose.pose.position.y = pose_y_;
-                    odom.pose.pose.position.z = 0.0;
-                    odom.pose.pose.orientation.x = q.x();
-                    odom.pose.pose.orientation.y = q.y();
-                    odom.pose.pose.orientation.z = q.z();
-                    odom.pose.pose.orientation.w = q.w();
+                    // Publicar Mensaje Odometry
+                    if (publish_odom_) {
+                        nav_msgs::msg::Odometry odom;
+                        odom.header.stamp = current_time;
+                        odom.header.frame_id = odom_frame_;
+                        odom.child_frame_id = base_frame_;
+                        
+                        // Pose
+                        odom.pose.pose.position.x = pose_x_;
+                        odom.pose.pose.position.y = pose_y_;
+                        odom.pose.pose.position.z = 0.0;
+                        odom.pose.pose.orientation.x = q.x();
+                        odom.pose.pose.orientation.y = q.y();
+                        odom.pose.pose.orientation.z = q.z();
+                        odom.pose.pose.orientation.w = q.w();
 
-                    // Añadir Covarianzas (Incertidumbre) - Obligatorio para Tarea 1.2
-                    // Pose Covariance
-                    odom.pose.covariance[0]  = 0.001; // x
-                    odom.pose.covariance[7]  = 0.001; // y
-                    odom.pose.covariance[35] = 0.001; // yaw
-                    
-                    // Twist (Velocidad en el frame local base_link)
-                    odom.twist.twist.linear.x = vx;
-                    odom.twist.twist.angular.z = wz;
-                    
-                    // Twist Covariance
-                    odom.twist.covariance[0]  = 0.001; // vx
-                    odom.twist.covariance[35] = 0.001; // wz
+                        // Añadir Covarianzas (Incertidumbre) - Obligatorio para Tarea 1.2
+                        // Pose Covariance
+                        odom.pose.covariance[0]  = 0.001; // x
+                        odom.pose.covariance[7]  = 0.001; // y
+                        odom.pose.covariance[35] = 0.001; // yaw
+                        
+                        // Twist (Velocidad en el frame local base_link)
+                        odom.twist.twist.linear.x = vx;
+                        odom.twist.twist.angular.z = wz;
+                        
+                        // Twist Covariance
+                        odom.twist.covariance[0]  = 0.001; // vx
+                        odom.twist.covariance[35] = 0.001; // wz
 
-                    odom_pub_->publish(odom);
+                        odom_pub_->publish(odom);
+                    }
                 }
             }
         }
