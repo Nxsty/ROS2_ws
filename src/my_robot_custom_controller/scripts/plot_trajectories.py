@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -30,6 +30,7 @@ class TrajectoryPlotterNode(Node):
         self.gt_x, self.gt_y = [], []
         self.raw_x, self.raw_y = [], []
         self.ekf_x, self.ekf_y = [], []
+        self.ref_x, self.ref_y = [], []
 
         # Current latest values
         self.current_gt = None
@@ -43,6 +44,12 @@ class TrajectoryPlotterNode(Node):
             durability=DurabilityPolicy.VOLATILE
         )
 
+        path_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL
+        )
+
         # Subscriptions
         self.gt_sub = self.create_subscription(
             Odometry, '/model/my_robot/odometry', self.gt_callback, qos
@@ -53,17 +60,21 @@ class TrajectoryPlotterNode(Node):
         self.ekf_sub = self.create_subscription(
             Odometry, '/odom', self.ekf_callback, qos
         )
+        self.ref_sub = self.create_subscription(
+            Path, '/reference_path', self.ref_callback, path_qos
+        )
 
         # Matplotlib interactive figure setup
         plt.ion()
         self.fig, self.ax = plt.subplots(figsize=(10, 8))
-        self.fig.canvas.manager.set_window_title("Trajectory Comparison: Ground Truth vs Raw VIO vs EKF")
+        self.fig.canvas.manager.set_window_title("Trajectory Comparison: MPC Reference vs Ground Truth vs EKF")
         
         # Setup static warehouse geometry
         self.setup_warehouse_plot()
 
         # Lines for plotting
-        self.line_gt, = self.ax.plot([], [], 'g--', linewidth=2.0, label='Ground Truth (Gazebo)', zorder=4)
+        self.line_ref, = self.ax.plot([], [], 'k--', linewidth=2.0, alpha=0.7, label='Reference Trajectory (MPC)', zorder=2)
+        self.line_gt, = self.ax.plot([], [], 'g-', linewidth=2.2, label='Ground Truth (Gazebo)', zorder=4)
         self.line_raw, = self.ax.plot([], [], 'r:', linewidth=1.5, label='Raw VIO (Before Filter)', zorder=3)
         self.line_ekf, = self.ax.plot([], [], 'b-', linewidth=2.2, label='EKF Filtered (/odom)', zorder=5)
 
@@ -122,6 +133,12 @@ class TrajectoryPlotterNode(Node):
         self.gt_y.append(p.y)
         self.current_gt = (p.x, p.y)
 
+    def ref_callback(self, msg: Path):
+        self.ref_x = [pose.pose.position.x for pose in msg.poses]
+        self.ref_y = [pose.pose.position.y for pose in msg.poses]
+        if self.ref_x:
+            self.line_ref.set_data(self.ref_x, self.ref_y)
+
     def raw_callback(self, msg: Odometry):
         p = msg.pose.pose.position
         self.raw_x.append(p.x)
@@ -139,6 +156,8 @@ class TrajectoryPlotterNode(Node):
             return
 
         # Update line data
+        if self.ref_x:
+            self.line_ref.set_data(self.ref_x, self.ref_y)
         if self.gt_x:
             self.line_gt.set_data(self.gt_x, self.gt_y)
         if self.raw_x:
@@ -162,14 +181,21 @@ class TrajectoryPlotterNode(Node):
             ekf_err_str = ""
             if self.current_gt:
                 ekf_err = math.sqrt((self.current_ekf[0] - self.current_gt[0])**2 + (self.current_ekf[1] - self.current_gt[1])**2)
-                ekf_err_str = f" | Error: {ekf_err:.3f}m"
+                ekf_err_str = f" | Err to GT: {ekf_err:.3f}m"
             lines_info.append(f"EKF Filtered: ({self.current_ekf[0]:.2f}, {self.current_ekf[1]:.2f})m{ekf_err_str}")
         if self.current_raw:
             raw_err_str = ""
             if self.current_gt:
                 raw_err = math.sqrt((self.current_raw[0] - self.current_gt[0])**2 + (self.current_raw[1] - self.current_gt[1])**2)
-                raw_err_str = f" | Error: {raw_err:.3f}m"
+                raw_err_str = f" | Err to GT: {raw_err:.3f}m"
             lines_info.append(f"Raw VIO:      ({self.current_raw[0]:.2f}, {self.current_raw[1]:.2f})m{raw_err_str}")
+
+        # MPC Tracking error (cross-track distance to planned reference path)
+        if self.current_gt and self.ref_x:
+            # Distance from actual physical robot (GT) to planned reference
+            dists = [(gx - self.current_gt[0])**2 + (gy - self.current_gt[1])**2 for gx, gy in zip(self.ref_x, self.ref_y)]
+            mpc_tracking_err = math.sqrt(min(dists))
+            lines_info.append(f"MPC Tracking: Actual vs Ref Path Err: {mpc_tracking_err:.3f}m")
 
         if lines_info:
             self.info_text.set_text("\n".join(lines_info))

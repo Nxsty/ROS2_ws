@@ -28,49 +28,7 @@
                            o_xyz="0 0 ${base_height/2.0}" o_rpy="0 0 0" />
     </link>
     
-    <xacro:macro name="wheel_link" params="prefix0 prefix1">
-        <link name="${prefix0}_${prefix1}_wheel_link">
-            <visual>
-                <geometry>
-                    <cylinder radius="${wheel_radius}" length="${wheel_length}" />
-                </geometry>
-                <origin xyz="0 0 0" rpy="${pi / 2.0} 0 0" />
-                <material name="grey" />
-            </visual>
-            <collision>
-                <geometry>
-                    <!-- IMPORTANT: Use sphere for collision in Gazebo for better steering -->
-                    <sphere radius="${wheel_radius}" />
-                </geometry>
-                <origin xyz="0 0 0" rpy="0 0 0" />
-            </collision>
-            <xacro:wheel_inertia m="3.0" r="${wheel_radius}" l="${wheel_length}"
-                           o_xyz="0 0 0" o_rpy="${pi / 2.0} 0 0" />
-        </link>
-    </xacro:macro>
-
-    <xacro:wheel_link prefix0="right" prefix1="back"/>
-    <xacro:wheel_link prefix0="left" prefix1="back"/>
-    <xacro:wheel_link prefix0="right" prefix1="front"/>
-    <xacro:wheel_link prefix0="left" prefix1="front"/>
-
-    <!-- <link name="caster_wheel_link">
-        <visual>
-            <geometry>
-                <sphere radius="${wheel_radius/2.0}" />
-            </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
-            <material name="grey" />
-        </visual>
-        <collision>
-            <geometry>
-                <sphere radius="${wheel_radius/2.0}" />
-            </geometry>
-            <origin xyz="0 0 0" rpy="0 0 0" />
-        </collision>
-        <xacro:caster_wheel_inertia m="0.5" r="${wheel_radius/2.0}"
-                           o_xyz="0 0 0" o_rpy="0 0 0" />
-    </link> -->
+    <xacro:include filename="mecanum_wheel.urdf.xacro"/>
 
     <joint name="base_joint" type="fixed">
         <parent link="base_footprint"/>
@@ -78,53 +36,45 @@
         <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
     </joint>
 
-    <joint name="base_right_back_wheel_joint" type="continuous">
-        <parent link="base_link" />
-        <child link="right_back_wheel_link"/>
-        <origin xyz="${-base_lenght / 2.5} ${-(base_width+wheel_length)/2.0 - 0.01} 0" rpy="0 0 0"/>
-        <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="30"/>
-        <dynamics damping="0.1" friction="0.1"/>
-        <gazebo>
-            <provideFeedback>true</provideFeedback>
-        </gazebo>
-    </joint>
+    <!-- Mecanum Wheels with original cylinder visual, but mecanum collision & inertia -->
+    <xacro:mecanum_wheel 
+        side="left_front"
+        radius="${wheel_radius}" 
+        width="${wheel_length}" 
+        pos_x="${base_lenght / 2.5}" 
+        pos_y="${(base_width+wheel_length)/2.0 + 0.01}" 
+        pos_z="0" 
+        mass="3.0"
+    />
 
-    <joint name="base_left_back_wheel_joint" type="continuous">
-        <parent link="base_link" />
-        <child link="left_back_wheel_link"/>
-        <origin xyz="${-base_lenght / 2.5} ${(base_width+wheel_length)/2.0 + 0.01} 0" rpy="0 0 0"/>
-        <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="30"/>
-        <dynamics damping="0.1" friction="0.1"/>
-        <gazebo>
-            <provideFeedback>true</provideFeedback>
-        </gazebo>
-    </joint>
+    <xacro:mecanum_wheel 
+        side="right_front"
+        radius="${wheel_radius}" 
+        width="${wheel_length}" 
+        pos_x="${base_lenght / 2.5}" 
+        pos_y="${-(base_width+wheel_length)/2.0 - 0.01}" 
+        pos_z="0" 
+        mass="3.0"
+    />
 
-    <joint name="base_right_front_wheel_joint" type="continuous">
-        <parent link="base_link" />
-        <child link="right_front_wheel_link"/>
-        <origin xyz="${base_lenght / 2.5} ${-(base_width+wheel_length)/2.0 - 0.01} 0" rpy="0 0 0"/>
-        <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="30"/>
-        <dynamics damping="0.1" friction="0.1"/>
-        <gazebo>
-            <provideFeedback>true</provideFeedback>
-        </gazebo>
-    </joint>
+    <xacro:mecanum_wheel 
+        side="left_back"
+        radius="${wheel_radius}" 
+        width="${wheel_length}" 
+        pos_x="${-base_lenght / 2.5}" 
+        pos_y="${(base_width+wheel_length)/2.0 + 0.01}" 
+        pos_z="0" 
+        mass="3.0"
+    />
 
-    <joint name="base_left_front_wheel_joint" type="continuous">
-        <parent link="base_link" />
-        <child link="left_front_wheel_link"/>
-        <origin xyz="${base_lenght / 2.5} ${(base_width+wheel_length)/2.0 + 0.01} 0" rpy="0 0 0"/>
-        <axis xyz="0 1 0"/>
-        <limit effort="10000" velocity="30"/>
-        <dynamics damping="0.1" friction="0.1"/>
-        <gazebo>
-            <provideFeedback>true</provideFeedback>
-        </gazebo>
-    </joint>
+    <xacro:mecanum_wheel 
+        side="right_back"
+        radius="${wheel_radius}" 
+        width="${wheel_length}" 
+        pos_x="${-base_lenght / 2.5}" 
+        pos_y="${-(base_width+wheel_length)/2.0 - 0.01}" 
+        pos_z="0" 
+        mass="3.0"
+    />
       
-    
 </robot>

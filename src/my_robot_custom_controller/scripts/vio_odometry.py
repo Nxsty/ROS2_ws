@@ -36,63 +36,75 @@ def euler_to_quaternion(roll, pitch, yaw):
 
 class EKFStateEstimator:
     """
-    5-State Extended Kalman Filter for Differential Drive Mobile Robot.
-    State: x = [x, y, theta, v, omega]^T
+    6-State Extended Kalman Filter for Omnidirectional / Mecanum Mobile Robot.
+    State: x = [x, y, theta, vx, vy, omega]^T
       - x, y: 2D position in world/odom frame (m)
       - theta: Heading in world/odom frame (rad)
-      - v: Linear forward velocity in base frame (m/s)
+      - vx: Linear forward velocity in base frame (m/s)
+      - vy: Linear lateral velocity in base frame (m/s)
       - omega: Yaw angular velocity in base frame (rad/s)
     """
 
     def __init__(self):
-        # State vector: [x, y, theta, v, omega]
-        self.x = np.zeros(5, dtype=np.float64)
+        # State vector: [x, y, theta, vx, vy, omega]
+        self.x = np.zeros(6, dtype=np.float64)
 
-        # State covariance P (5x5)
-        self.P = np.diag([0.01, 0.01, 0.005, 0.05, 0.05])
+        # State covariance P (6x6)
+        self.P = np.diag([0.01, 0.01, 0.005, 0.05, 0.05, 0.05])
 
-        # Process noise Q (5x5)
-        self.Q = np.diag([0.002, 0.002, 0.001, 0.05, 0.05])
+        # Process noise Q (6x6)
+        self.Q = np.diag([0.002, 0.002, 0.001, 0.05, 0.05, 0.05])
 
     def predict(self, dt: float):
-        """Kinematic motion model prediction step."""
+        """Kinematic motion model prediction step for Mecanum omnidirectional robot."""
         if dt <= 0.0 or dt > 0.5:
             return
 
-        x, y, theta, v, omega = self.x
-        if abs(v) < 0.02:
-            v = 0.0
+        x, y, theta, vx, vy, omega = self.x
+        if abs(vx) < 0.01:
+            vx = 0.0
             self.x[3] = 0.0
+        if abs(vy) < 0.01:
+            vy = 0.0
+            self.x[4] = 0.0
+        if abs(omega) < 0.005:
+            omega = 0.0
+            self.x[5] = 0.0
 
         theta_mid = theta + 0.5 * omega * dt
 
         # State transition
-        self.x[0] = x + v * math.cos(theta_mid) * dt
-        self.x[1] = y + v * math.sin(theta_mid) * dt
+        delta_x = (vx * math.cos(theta_mid) - vy * math.sin(theta_mid)) * dt
+        delta_y = (vx * math.sin(theta_mid) + vy * math.cos(theta_mid)) * dt
+
+        self.x[0] = x + delta_x
+        self.x[1] = y + delta_y
         self.x[2] = normalize_angle(theta + omega * dt)
 
-        # Jacobian F = df/dx
-        F = np.eye(5, dtype=np.float64)
-        F[0, 2] = -v * math.sin(theta_mid) * dt
+        # Jacobian F = df/dx (6x6)
+        F = np.eye(6, dtype=np.float64)
+        F[0, 2] = (-vx * math.sin(theta_mid) - vy * math.cos(theta_mid)) * dt
         F[0, 3] = math.cos(theta_mid) * dt
-        F[0, 4] = -0.5 * v * math.sin(theta_mid) * (dt ** 2)
+        F[0, 4] = -math.sin(theta_mid) * dt
+        F[0, 5] = -0.5 * (vx * math.sin(theta_mid) + vy * math.cos(theta_mid)) * (dt ** 2)
 
-        F[1, 2] = v * math.cos(theta_mid) * dt
+        F[1, 2] = (vx * math.cos(theta_mid) - vy * math.sin(theta_mid)) * dt
         F[1, 3] = math.sin(theta_mid) * dt
-        F[1, 4] = 0.5 * v * math.cos(theta_mid) * (dt ** 2)
+        F[1, 4] = math.cos(theta_mid) * dt
+        F[1, 5] = 0.5 * (vx * math.cos(theta_mid) - vy * math.sin(theta_mid)) * (dt ** 2)
 
-        F[2, 4] = dt
+        F[2, 5] = dt
 
         # Covariance update
         self.P = F @ self.P @ F.T + self.Q * dt
 
     def update_imu(self, omega_imu: float, var_omega: float = 0.0005):
         """Measurement update from IMU Gyroscope."""
-        H = np.zeros((1, 5), dtype=np.float64)
-        H[0, 4] = 1.0
+        H = np.zeros((1, 6), dtype=np.float64)
+        H[0, 5] = 1.0
 
         z = np.array([omega_imu], dtype=np.float64)
-        z_hat = np.array([self.x[4]], dtype=np.float64)
+        z_hat = np.array([self.x[5]], dtype=np.float64)
         y = z - z_hat
 
         R = np.array([[var_omega]], dtype=np.float64)
@@ -101,44 +113,65 @@ class EKFStateEstimator:
 
         self.x = self.x + (K @ y).flatten()
         self.x[2] = normalize_angle(self.x[2])
-        I = np.eye(5, dtype=np.float64)
+        I = np.eye(6, dtype=np.float64)
         self.P = (I - K @ H) @ self.P
 
-    def update_wheel_vel(self, v_wheel: float, omega_wheel: float, var_v: float = 0.005, var_omega: float = 0.005):
-        """Measurement update from Wheel Encoders."""
-        H = np.zeros((2, 5), dtype=np.float64)
+    def update_orientation(self, yaw_imu: float, var_yaw: float = 0.0005):
+        """Measurement update from IMU Orientation (Quaternion)."""
+        H = np.zeros((1, 6), dtype=np.float64)
+        H[0, 2] = 1.0
+
+        z = np.array([yaw_imu], dtype=np.float64)
+        z_hat = np.array([self.x[2]], dtype=np.float64)
+        y = normalize_angle(z[0] - z_hat[0])
+
+        R = np.array([[var_yaw]], dtype=np.float64)
+        S = H @ self.P @ H.T + R
+        K = self.P @ H.T @ np.linalg.inv(S)
+
+        self.x = self.x + (K.flatten() * y)
+        self.x[2] = normalize_angle(self.x[2])
+        I = np.eye(6, dtype=np.float64)
+        self.P = (I - K @ H) @ self.P
+
+    def update_wheel_vel(self, vx: float, vy: float, omega: float, 
+                         var_vx: float = 0.005, var_vy: float = 0.005, var_omega: float = 0.005):
+        """Measurement update from Mecanum Wheel Encoders."""
+        H = np.zeros((3, 6), dtype=np.float64)
+        H[0, 3] = 1.0
+        H[1, 4] = 1.0
+        H[2, 5] = 1.0
+
+        z = np.array([vx, vy, omega], dtype=np.float64)
+        z_hat = np.array([self.x[3], self.x[4], self.x[5]], dtype=np.float64)
+        y = z - z_hat
+
+        R = np.diag([var_vx, var_vy, var_omega])
+        S = H @ self.P @ H.T + R
+        K = self.P @ H.T @ np.linalg.inv(S)
+
+        self.x = self.x + (K @ y).flatten()
+        self.x[2] = normalize_angle(self.x[2])
+        I = np.eye(6, dtype=np.float64)
+        self.P = (I - K @ H) @ self.P
+
+    def update_vio(self, vx_vio: float, vy_vio: float = 0.0, var_vx: float = 0.015, var_vy: float = 0.020):
+        """Measurement update from Visual Odometry (2D Optical Flow: vx and vy)."""
+        H = np.zeros((2, 6), dtype=np.float64)
         H[0, 3] = 1.0
         H[1, 4] = 1.0
 
-        z = np.array([v_wheel, omega_wheel], dtype=np.float64)
+        z = np.array([vx_vio, vy_vio], dtype=np.float64)
         z_hat = np.array([self.x[3], self.x[4]], dtype=np.float64)
         y = z - z_hat
 
-        R = np.diag([var_v, var_omega])
+        R = np.diag([var_vx, var_vy])
         S = H @ self.P @ H.T + R
         K = self.P @ H.T @ np.linalg.inv(S)
 
         self.x = self.x + (K @ y).flatten()
         self.x[2] = normalize_angle(self.x[2])
-        I = np.eye(5, dtype=np.float64)
-        self.P = (I - K @ H) @ self.P
-
-    def update_vio(self, v_vio: float, var_v: float = 0.015):
-        """Measurement update from Visual Odometry (Optical Flow)."""
-        H = np.zeros((1, 5), dtype=np.float64)
-        H[0, 3] = 1.0
-
-        z = np.array([v_vio], dtype=np.float64)
-        z_hat = np.array([self.x[3]], dtype=np.float64)
-        y = z - z_hat
-
-        R = np.array([[var_v]], dtype=np.float64)
-        S = H @ self.P @ H.T + R
-        K = self.P @ H.T @ np.linalg.inv(S)
-
-        self.x = self.x + (K @ y).flatten()
-        self.x[2] = normalize_angle(self.x[2])
-        I = np.eye(5, dtype=np.float64)
+        I = np.eye(6, dtype=np.float64)
         self.P = (I - K @ H) @ self.P
 
 
@@ -182,6 +215,7 @@ class VIOOdometryNode(Node):
         self.raw_vio_y = 0.0
         self.raw_vio_theta = 0.0
         self.raw_vio_v = 0.0
+        self.raw_vio_vy = 0.0
 
         # --- Wheel velocity cache ---
         self.last_wheel_v = 0.0
@@ -303,18 +337,29 @@ class VIOOdometryNode(Node):
         # EKF Measurement Update for Gyroscope
         self.ekf.update_imu(gz, var_omega=0.0002)
 
-        # Raw VIO yaw integration (open loop)
-        dt = 0.01
-        self.raw_vio_theta = normalize_angle(self.raw_vio_theta + gz * dt)
+        # EKF Measurement Update for Absolute Yaw from IMU Orientation Quaternion
+        q = msg.orientation
+        if abs(q.w) > 1e-4 or abs(q.z) > 1e-4:
+            siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+            cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+            yaw_imu = math.atan2(siny_cosp, cosy_cosp)
+            self.ekf.update_orientation(yaw_imu, var_yaw=0.0005)
+            self.raw_vio_theta = yaw_imu
+        else:
+            # Fallback to gyro integration if quaternion is uninitialized
+            dt = 0.01
+            self.raw_vio_theta = normalize_angle(self.raw_vio_theta + gz * dt)
 
     def wheel_vel_callback(self, msg: Twist):
         vx = msg.linear.x
+        vy = msg.linear.y
         wz = msg.angular.z
         self.last_wheel_v = vx
+        self.last_wheel_vy = vy
         self.last_wheel_w = wz
 
-        # EKF Measurement Update for Wheel Encoders
-        self.ekf.update_wheel_vel(vx, wz, var_v=0.002, var_omega=0.002)
+        # EKF Measurement Update for Mecanum Wheel Encoders (Tolerancia realista a deslizamientos)
+        self.ekf.update_wheel_vel(vx, vy, wz, var_vx=0.015, var_vy=0.015, var_omega=0.002)
 
     def image_callback(self, msg: Image):
         try:
@@ -362,7 +407,8 @@ class VIOOdometryNode(Node):
         if len(good_prev) >= 4:
             self.visual_tracking_active = True
             dx_estimates = []
-            current_wz = self.ekf.x[4]
+            dy_estimates = []
+            current_wz = self.ekf.x[5]
 
             for p0, p1 in zip(good_prev, good_next):
                 u0, v0 = p0[0, 0], p0[0, 1]
@@ -372,6 +418,7 @@ class VIOOdometryNode(Node):
                 cv2.line(debug_img, (int(u0), int(v0)), (int(u1), int(v1)), (0, 0, 255), 1)
 
                 dv_observed = v1 - v0
+                du_observed = u1 - u0
                 y_img = v0 - self.cy
 
                 # Strict Floor Region Filtering:
@@ -382,27 +429,41 @@ class VIOOdometryNode(Node):
                     dv_rot = ((u0 - self.cx) * (v0 - self.cy) / self.fx) * (current_wz * dt)
                     dv_trans = dv_observed - dv_rot
 
-                    # Ground plane metric displacement
+                    # Ground plane metric displacement along forward axis (X_robot)
                     dx_i = (dv_trans * self.fy * self.camera_height) / (y_img ** 2)
                     
-                    # Sanity check: individual point displacement should be reasonable
-                    if -0.05 <= dx_i <= 0.20:
+                    if -0.10 <= dx_i <= 0.25:
                         dx_estimates.append(dx_i)
+
+                    # Derotate horizontal optical flow
+                    # Camera yaw rotation produces du_rot = -(fx + (u0-cx)^2 / fx) * wz * dt
+                    du_rot = -(self.fx + ((u0 - self.cx) ** 2) / self.fx) * (current_wz * dt)
+                    du_trans = du_observed - du_rot
+
+                    # Ground plane lateral metric displacement:
+                    # u increases to right (+X_cam), which corresponds to -Y_robot
+                    dy_i = -(du_trans * self.camera_height * self.fy) / (y_img * self.fx)
+                    if -0.20 <= dy_i <= 0.20:
+                        dy_estimates.append(dy_i)
 
             if len(dx_estimates) >= 4:
                 dx_med = float(np.median(dx_estimates))
                 v_vio_meas = dx_med / dt if dt > 0 else 0.0
 
+                dy_med = float(np.median(dy_estimates)) if len(dy_estimates) >= 4 else 0.0
+                vy_vio_meas = dy_med / dt if dt > 0 else 0.0
+
                 # 1. Update Raw VIO Open-Loop Odometry (Before Filter)
                 self.raw_vio_v = v_vio_meas
-                self.raw_vio_x += dx_med * math.cos(self.raw_vio_theta)
-                self.raw_vio_y += dx_med * math.sin(self.raw_vio_theta)
+                self.raw_vio_vy = vy_vio_meas
+                self.raw_vio_x += (dx_med * math.cos(self.raw_vio_theta) - dy_med * math.sin(self.raw_vio_theta))
+                self.raw_vio_y += (dx_med * math.sin(self.raw_vio_theta) + dy_med * math.cos(self.raw_vio_theta))
 
                 # 2. EKF Measurement Update with Outlier & Rotation Gating
-                pred_v = self.ekf.x[3]
-                # If robot is not turning fast and visual velocity is consistent with wheel/predicted velocity
-                if abs(current_wz) < 0.25 and abs(v_vio_meas - pred_v) < 0.40:
-                    self.ekf.update_vio(v_vio_meas, var_v=0.015)
+                pred_vx = self.ekf.x[3]
+                pred_vy = self.ekf.x[4]
+                if abs(current_wz) < 0.50 and abs(v_vio_meas - pred_vx) < 0.60:
+                    self.ekf.update_vio(v_vio_meas, vy_vio_meas, var_vx=0.015, var_vy=0.020)
 
             # Re-detect if feature count drops
             if len(good_next) < self.min_features:
@@ -427,7 +488,7 @@ class VIOOdometryNode(Node):
                 f"EKF-VIO: {'ACTIVE' if self.visual_tracking_active else 'SEARCHING'} | "
                 f"Pts: {len(good_prev)} | "
                 f"Pose: ({self.ekf.x[0]:.2f}, {self.ekf.x[1]:.2f}, {math.degrees(self.ekf.x[2]):.1f}deg) | "
-                f"v: {self.ekf.x[3]:.2f}m/s"
+                f"vx: {self.ekf.x[3]:.2f}, vy: {self.ekf.x[4]:.2f}m/s"
             )
             cv2.putText(debug_img, status_text, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 2)
             debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding='bgr8')
@@ -442,7 +503,8 @@ class VIOOdometryNode(Node):
         pose_y = float(self.ekf.x[1])
         pose_theta = float(self.ekf.x[2])
         vx = float(self.ekf.x[3])
-        wz = float(self.ekf.x[4])
+        vy = float(self.ekf.x[4])
+        wz = float(self.ekf.x[5])
 
         q = euler_to_quaternion(0.0, 0.0, pose_theta)
 
@@ -469,17 +531,20 @@ class VIOOdometryNode(Node):
         odom.pose.pose.position.z = 0.0
         odom.pose.pose.orientation = q
 
+        # Covariances
         odom.pose.covariance[0] = float(self.ekf.P[0, 0])    # Var(x)
         odom.pose.covariance[1] = float(self.ekf.P[0, 1])    # Cov(x, y)
         odom.pose.covariance[7] = float(self.ekf.P[1, 1])    # Var(y)
         odom.pose.covariance[35] = float(self.ekf.P[2, 2])   # Var(theta)
 
+        # Twist (Local robot frame)
         odom.twist.twist.linear.x = vx
-        odom.twist.twist.linear.y = 0.0
+        odom.twist.twist.linear.y = vy
         odom.twist.twist.angular.z = wz
 
         odom.twist.covariance[0] = float(self.ekf.P[3, 3])   # Var(vx)
-        odom.twist.covariance[35] = float(self.ekf.P[4, 4])  # Var(wz)
+        odom.twist.covariance[7] = float(self.ekf.P[4, 4])   # Var(vy)
+        odom.twist.covariance[35] = float(self.ekf.P[5, 5])  # Var(wz)
 
         self.odom_pub.publish(odom)
 
@@ -494,6 +559,7 @@ class VIOOdometryNode(Node):
         raw_odom.pose.pose.position.z = 0.0
         raw_odom.pose.pose.orientation = euler_to_quaternion(0.0, 0.0, self.raw_vio_theta)
         raw_odom.twist.twist.linear.x = self.raw_vio_v
+        raw_odom.twist.twist.linear.y = self.raw_vio_vy
         raw_odom.twist.twist.angular.z = wz
         self.raw_vio_pub.publish(raw_odom)
 

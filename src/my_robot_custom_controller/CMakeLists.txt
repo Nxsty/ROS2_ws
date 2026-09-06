@@ -27,9 +27,19 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(diff_drive_controller src/diff_drive_controller.cpp)
+add_executable(mecanum_drive_controller src/mecanum_drive_controller.cpp)
 add_executable(pose_controller src/pose_controller.cpp)
 
 ament_target_dependencies(diff_drive_controller
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+  nav_msgs
+  std_msgs
+  tf2_ros
+)
+
+ament_target_dependencies(mecanum_drive_controller
   rclcpp
   geometry_msgs
   sensor_msgs
@@ -47,6 +57,7 @@ ament_target_dependencies(pose_controller
 
 install(TARGETS
   diff_drive_controller
+  mecanum_drive_controller
   pose_controller
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -64,6 +75,8 @@ install(PROGRAMS
   scripts/vio_odometry.py
   scripts/trajectory_manager.py
   scripts/plot_trajectories.py
+  scripts/trajectory_generator.py
+  scripts/mpc_controller.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

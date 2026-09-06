@@ -1,0 +1,94 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro" xmlns:gz="http://gazebosim.org/schema">
+
+  <xacro:macro name="mecanum_wheel" params="side radius width pos_x pos_y pos_z mass mesh_file:='' joint_name:='' link_name:=''">
+    
+    <xacro:property name="_link_name" value="${link_name if link_name != '' else side + '_wheel_link'}"/>
+    <xacro:property name="_joint_name" value="${joint_name if joint_name != '' else 'base_' + side + '_wheel_joint'}"/>
+
+    <link name="${_link_name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${radius}" length="${width}"/>
+        </geometry>
+        <material name="grey">
+          <color rgba="0.5 0.5 0.5 1.0"/>
+        </material>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${radius}" length="${width}"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${mass}"/>
+        <inertia ixx="${(1.0/12.0) * mass * (3.0*radius*radius + width*width)}" ixy="0" ixz="0"
+                 iyy="${(1.0/2.0) * mass * (radius * radius)}" iyz="0"
+                 izz="${(1.0/12.0) * mass * (3.0*radius*radius + width*width)}" />
+      </inertial>
+    </link>
+
+    <gazebo reference="${_link_name}">
+      <collision>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.2</mu>
+              <mu2>0.15</mu2>
+              <xacro:if value="${side == 'front_left' or side == 'left_front'}">
+                <fdir1 gz:expressed_in="base_footprint">1 -1 0</fdir1>
+              </xacro:if>
+              <xacro:if value="${side == 'rear_left' or side == 'left_back'}">
+                <fdir1 gz:expressed_in="base_footprint">1 1 0</fdir1>
+              </xacro:if>
+              <xacro:if value="${side == 'front_right' or side == 'right_front'}">
+                <fdir1 gz:expressed_in="base_footprint">1 1 0</fdir1>
+              </xacro:if>
+              <xacro:if value="${side == 'rear_right' or side == 'right_back'}">
+                <fdir1 gz:expressed_in="base_footprint">1 -1 0</fdir1>
+              </xacro:if>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>10000000.0</kp>
+              <kd>100.0</kd>
+              <min_depth>0.001</min_depth>
+              <max_vel>0.01</max_vel>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+    </gazebo>
+
+    <gazebo reference="${_link_name}">  
+      <visual>  
+        <material>
+          <ambient>0.3 0.3 0.3 1.0</ambient>  
+          <diffuse>0.5 0.5 0.5 1.0</diffuse>  
+          <specular>0.2 0.2 0.2 1.0</specular>  
+          <emissive>0.0 0.0 0.0 0.0</emissive>  
+        </material>
+      </visual>  
+    </gazebo>
+
+    <joint name="${_joint_name}" type="continuous">
+      <axis xyz="0 1 0" />
+      <parent link="base_link"/>
+      <child link="${_link_name}"/>
+      <origin xyz="${pos_x} ${pos_y} ${pos_z}" rpy="0 0 0"/>
+      <limit effort="10000" velocity="30"/>
+      <dynamics damping="0.1" friction="0.1"/>
+      <gazebo>
+        <provideFeedback>true</provideFeedback>
+      </gazebo>
+    </joint>
+
+  </xacro:macro>
+
+</robot>

@@ -12,8 +12,8 @@ def generate_launch_description():
     # Launch configuration
     use_vio_arg = DeclareLaunchArgument(
         'use_vio',
-        default_value='false',
-        description='Whether to use Visual-Inertial Odometry instead of wheel encoders'
+        default_value='true',
+        description='Whether to use EKF Visual-Inertial Odometry to filter IMU and encoders'
     )
     use_vio = LaunchConfiguration('use_vio')
 
@@ -105,48 +105,52 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
-    # Diff Drive Controller (Standard Encoder Mode)
-    diff_drive_controller_node = Node(
+    # Mecanum Drive Controller (Standard Encoder Mode)
+    mecanum_drive_controller_node = Node(
         package='my_robot_custom_controller',
-        executable='diff_drive_controller',
+        executable='mecanum_drive_controller',
         output='screen',
         condition=UnlessCondition(use_vio),
         parameters=[{
             'wheel_radius': 0.1,
-            'wheel_separation': 0.47,
+            'wheel_separation_x': 0.272,
+            'wheel_separation_y': 0.225,
             'left_front_wheel_joint': 'base_left_front_wheel_joint',
-            'left_back_wheel_joint': 'base_left_back_wheel_joint',
             'right_front_wheel_joint': 'base_right_front_wheel_joint',
+            'left_back_wheel_joint': 'base_left_back_wheel_joint',
             'right_back_wheel_joint': 'base_right_back_wheel_joint',
             'left_front_wheel_topic': '/base_left_front_wheel_joint/cmd_vel',
-            'left_back_wheel_topic': '/base_left_back_wheel_joint/cmd_vel',
             'right_front_wheel_topic': '/base_right_front_wheel_joint/cmd_vel',
+            'left_back_wheel_topic': '/base_left_back_wheel_joint/cmd_vel',
             'right_back_wheel_topic': '/base_right_back_wheel_joint/cmd_vel',
             'base_frame': 'base_footprint',
+            'odom_frame': 'odom',
             'publish_odom': True,
             'publish_tf': True,
             'use_sim_time': True
         }]
     )
 
-    # Diff Drive Controller (VIO Actuator-only Mode)
-    diff_drive_controller_vio_mode_node = Node(
+    # Mecanum Drive Controller (VIO Actuator-only Mode)
+    mecanum_drive_controller_vio_mode_node = Node(
         package='my_robot_custom_controller',
-        executable='diff_drive_controller',
+        executable='mecanum_drive_controller',
         output='screen',
         condition=IfCondition(use_vio),
         parameters=[{
             'wheel_radius': 0.1,
-            'wheel_separation': 0.47,
+            'wheel_separation_x': 0.272,
+            'wheel_separation_y': 0.225,
             'left_front_wheel_joint': 'base_left_front_wheel_joint',
-            'left_back_wheel_joint': 'base_left_back_wheel_joint',
             'right_front_wheel_joint': 'base_right_front_wheel_joint',
+            'left_back_wheel_joint': 'base_left_back_wheel_joint',
             'right_back_wheel_joint': 'base_right_back_wheel_joint',
             'left_front_wheel_topic': '/base_left_front_wheel_joint/cmd_vel',
-            'left_back_wheel_topic': '/base_left_back_wheel_joint/cmd_vel',
             'right_front_wheel_topic': '/base_right_front_wheel_joint/cmd_vel',
+            'left_back_wheel_topic': '/base_left_back_wheel_joint/cmd_vel',
             'right_back_wheel_topic': '/base_right_back_wheel_joint/cmd_vel',
             'base_frame': 'base_footprint',
+            'odom_frame': 'odom',
             'publish_odom': False,
             'publish_tf': False,
             'use_sim_time': True
@@ -181,7 +185,7 @@ def generate_launch_description():
         spawn_robot_node,
         gazebo_bridge_node,
         rviz_node,
-        diff_drive_controller_node,
-        diff_drive_controller_vio_mode_node,
+        mecanum_drive_controller_node,
+        mecanum_drive_controller_vio_mode_node,
         vio_odometry_node
     ])
