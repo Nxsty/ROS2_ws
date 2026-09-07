@@ -144,6 +144,7 @@ class ContinuousTrajectoryGenerator(Node):
         if self.auto_start and not self.mission_generated and self.current_pose is not None:
             self.generate_and_publish_warehouse_mission()
             self.mission_generated = True
+            self.destroy_subscription(self.odom_sub)
 
     def goal_callback(self, msg: PoseStamped):
         """Dynamic goal received (e.g. from RViz 2D Goal Pose tool)."""

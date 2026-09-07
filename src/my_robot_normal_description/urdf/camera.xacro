@@ -58,7 +58,7 @@
             </camera>
             <always_on>1</always_on>
             <update_rate>20</update_rate>
-            <visualize>true</visualize>
+            <visualize>false</visualize>
             <topic>camera/image_raw</topic>            
         </sensor>
     </gazebo>

@@ -29,21 +29,21 @@ def generate_launch_description():
 
     max_vel_arg = DeclareLaunchArgument(
         'max_velocity',
-        default_value='1.0',
+        default_value='0.6',
         description='Maximum trajectory cruising velocity (m/s)'
     )
     max_vel = LaunchConfiguration('max_velocity')
 
     max_accel_arg = DeclareLaunchArgument(
         'max_acceleration',
-        default_value='0.8',
+        default_value='0.5',
         description='Maximum trajectory acceleration (m/s^2)'
     )
     max_accel = LaunchConfiguration('max_acceleration')
 
     max_lat_accel_arg = DeclareLaunchArgument(
         'max_lateral_accel',
-        default_value='0.6',
+        default_value='0.4',
         description='Maximum lateral centripetal acceleration on curves (m/s^2)'
     )
     max_lat_accel = LaunchConfiguration('max_lateral_accel')
@@ -69,26 +69,26 @@ def generate_launch_description():
         output='screen',
         condition=IfCondition(use_mpc),
         parameters=[{
-            'horizon': 15,
+            'horizon': 10,
             'dt': 0.05,
-            'max_linear_vel': 1.20,
-            'max_lateral_vel': 0.40,
-            'max_angular_vel': 1.50,
-            'max_linear_accel': 1.00,
-            'max_angular_accel': 1.80,
+            'max_linear_vel': 1.00,
+            'max_lateral_vel': 0.80,
+            'max_angular_vel': 1.20,
+            'max_linear_accel': 0.80,
+            'max_angular_accel': 1.50,
             'max_wheel_speed': 20.0,
             'wheel_radius': 0.10,
             'wheel_separation_x': 0.272,
             'wheel_separation_y': 0.225,
-            'q_x': 35.0,
-            'q_y': 40.0,
-            'q_yaw': 25.0,
-            'r_vx': 0.3,
-            'r_vy': 1.2,
-            'r_wz': 0.2,
-            's_vx': 2.5,
-            's_vy': 3.0,
-            's_wz': 1.2,
+            'q_x': 20.0,
+            'q_y': 20.0,
+            'q_yaw': 15.0,
+            'r_vx': 0.8,
+            'r_vy': 1.0,
+            'r_wz': 0.5,
+            's_vx': 3.5,
+            's_vy': 4.0,
+            's_wz': 2.0,
             'q_terminal_mult': 2.0,
             'use_sim_time': True
         }]

@@ -3,19 +3,33 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, SetEnvironmentVariable, DeclareLaunchArgument
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
     # Launch configuration
+    headless_arg = DeclareLaunchArgument(
+        'headless',
+        default_value='False',
+        description='Run Gazebo in server-only (headless) mode'
+    )
+    headless = LaunchConfiguration('headless')
+
     use_vio_arg = DeclareLaunchArgument(
         'use_vio',
         default_value='true',
         description='Whether to use EKF Visual-Inertial Odometry to filter IMU and encoders'
     )
     use_vio = LaunchConfiguration('use_vio')
+
+    enable_vision_arg = DeclareLaunchArgument(
+        'enable_vision',
+        default_value='true',
+        description='Enable monocular camera optical flow in EKF (set to false to use IMU + Wheel Encoders only)'
+    )
+    enable_vision = LaunchConfiguration('enable_vision')
 
     world_arg = DeclareLaunchArgument(
         'world',
@@ -52,10 +66,16 @@ def generate_launch_description():
         }]
     )
 
-    # Gazebo
+    # Gazebo - Pass '-s' if headless is true
+    gz_args = PythonExpression([
+        "'", world_path, " -r'", 
+        " if '", headless, "' == 'False' else ",
+        "'", world_path, " -r -s'"
+    ])
+
     gazebo_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(ros_gz_sim_pkg, 'launch', 'gz_sim.launch.py')),
-        launch_arguments={'gz_args': [world_path, ' -r']}.items()
+        launch_arguments={'gz_args': gz_args}.items()
     )
 
     # Spawn coordinates
@@ -168,12 +188,15 @@ def generate_launch_description():
             'base_frame': 'base_footprint',
             'camera_height': 0.1575,
             'publish_tf': True,
+            'enable_vision': enable_vision,
             'use_sim_time': True
         }]
     )
 
     return LaunchDescription([
+        headless_arg,
         use_vio_arg,
+        enable_vision_arg,
         world_arg,
         spawn_x_arg,
         spawn_y_arg,

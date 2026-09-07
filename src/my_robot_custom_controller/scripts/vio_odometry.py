@@ -192,11 +192,13 @@ class VIOOdometryNode(Node):
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'base_footprint')
         self.declare_parameter('publish_tf', True)
-        self.declare_parameter('max_features', 300)
-        self.declare_parameter('min_features', 20)
+        self.declare_parameter('max_features', 60)
+        self.declare_parameter('min_features', 15)
         self.declare_parameter('feature_quality', 0.005)
-        self.declare_parameter('feature_min_dist', 8)
+        self.declare_parameter('feature_min_dist', 12)
         self.declare_parameter('camera_height', 0.1575)
+        self.declare_parameter('enable_debug_image', False)
+        self.declare_parameter('enable_vision', True)
 
         self.odom_frame = self.get_parameter('odom_frame').value
         self.base_frame = self.get_parameter('base_frame').value
@@ -206,6 +208,8 @@ class VIOOdometryNode(Node):
         self.feature_quality = self.get_parameter('feature_quality').value
         self.feature_min_dist = self.get_parameter('feature_min_dist').value
         self.camera_height = self.get_parameter('camera_height').value
+        self.enable_debug_image = self.get_parameter('enable_debug_image').value
+        self.enable_vision = bool(self.get_parameter('enable_vision').value)
 
         # --- EKF Estimator ---
         self.ekf = EKFStateEstimator()
@@ -263,12 +267,16 @@ class VIOOdometryNode(Node):
         )
 
         # --- Subscriptions ---
-        self.cam_info_sub = self.create_subscription(
-            CameraInfo, '/camera/camera_info', self.camera_info_callback, 10
-        )
-        self.image_sub = self.create_subscription(
-            Image, '/camera/image_raw', self.image_callback, 10
-        )
+        if self.enable_vision:
+            self.cam_info_sub = self.create_subscription(
+                CameraInfo, '/camera/camera_info', self.camera_info_callback, 10
+            )
+            self.image_sub = self.create_subscription(
+                Image, '/camera/image_raw', self.image_callback, 10
+            )
+        else:
+            self.cam_info_sub = None
+            self.image_sub = None
         self.imu_sub = self.create_subscription(
             Imu, '/imu/data', self.imu_callback, 50
         )
@@ -362,6 +370,9 @@ class VIOOdometryNode(Node):
         self.ekf.update_wheel_vel(vx, vy, wz, var_vx=0.015, var_vy=0.015, var_omega=0.002)
 
     def image_callback(self, msg: Image):
+        if not self.enable_vision:
+            return
+
         try:
             curr_frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as e:
@@ -369,19 +380,34 @@ class VIOOdometryNode(Node):
             return
 
         curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
-        curr_time = self.get_clock().now()
 
+        # Calculate dt using image header timestamp to be resilient to callback queueing
+        msg_time = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         dt = 0.05
-        if self.last_img_time is not None:
+        if hasattr(self, '_last_img_stamp') and self._last_img_stamp is not None and msg_time > self._last_img_stamp:
+            dt = msg_time - self._last_img_stamp
+            dt = max(0.02, min(dt, 0.20))
+        elif self.last_img_time is not None:
+            curr_time = self.get_clock().now()
             dt = (curr_time - self.last_img_time).nanoseconds / 1e9
             if dt <= 0 or dt > 0.5:
                 dt = 0.05
-        self.last_img_time = curr_time
+        self._last_img_stamp = msg_time
+        self.last_img_time = self.get_clock().now()
+
+        # Ground ROI mask (only look at floor in front of the robot, saving CPU and rejecting shelf/ceiling corners)
+        h, w = curr_gray.shape
+        floor_y = int(self.cy + 45)
+        floor_mask = np.zeros((h, w), dtype=np.uint8)
+        if floor_y < h:
+            floor_mask[floor_y:, :] = 255
+        else:
+            floor_mask = None
 
         # Initial frame or re-detection
         if self.prev_gray is None or self.prev_pts is None or len(self.prev_pts) < self.min_features:
             self.prev_gray = curr_gray
-            corners = cv2.goodFeaturesToTrack(curr_gray, mask=None, **self.feature_params)
+            corners = cv2.goodFeaturesToTrack(curr_gray, mask=floor_mask, **self.feature_params)
             if corners is not None and len(corners) > 0:
                 self.prev_pts = corners
             return
@@ -402,7 +428,8 @@ class VIOOdometryNode(Node):
         good_prev = np.array(good_prev, dtype=np.float32)
         good_next = np.array(good_next, dtype=np.float32)
 
-        debug_img = curr_frame.copy()
+        should_debug = self.enable_debug_image and (self.debug_img_pub.get_subscription_count() > 0)
+        debug_img = curr_frame.copy() if should_debug else None
 
         if len(good_prev) >= 4:
             self.visual_tracking_active = True
@@ -414,8 +441,9 @@ class VIOOdometryNode(Node):
                 u0, v0 = p0[0, 0], p0[0, 1]
                 u1, v1 = p1[0, 0], p1[0, 1]
 
-                cv2.circle(debug_img, (int(u1), int(v1)), 3, (0, 255, 0), -1)
-                cv2.line(debug_img, (int(u0), int(v0)), (int(u1), int(v1)), (0, 0, 255), 1)
+                if debug_img is not None:
+                    cv2.circle(debug_img, (int(u1), int(v1)), 3, (0, 255, 0), -1)
+                    cv2.line(debug_img, (int(u0), int(v0)), (int(u1), int(v1)), (0, 0, 255), 1)
 
                 dv_observed = v1 - v0
                 du_observed = u1 - u0
@@ -436,13 +464,15 @@ class VIOOdometryNode(Node):
                         dx_estimates.append(dx_i)
 
                     # Derotate horizontal optical flow
-                    # Camera yaw rotation produces du_rot = -(fx + (u0-cx)^2 / fx) * wz * dt
-                    du_rot = -(self.fx + ((u0 - self.cx) ** 2) / self.fx) * (current_wz * dt)
+                    # When robot turns CCW (+wz), world features move to the right (+u in image).
+                    # Standard optical flow: du_rot = +(fx + (u0-cx)^2 / fx) * wz * dt
+                    du_rot = (self.fx + ((u0 - self.cx) ** 2) / self.fx) * (current_wz * dt)
                     du_trans = du_observed - du_rot
 
                     # Ground plane lateral metric displacement:
-                    # u increases to right (+X_cam), which corresponds to -Y_robot
-                    dy_i = -(du_trans * self.camera_height * self.fy) / (y_img * self.fx)
+                    # When robot moves LEFT (+Y_robot), world features move to the right (+u, du_trans > 0).
+                    # Standard ground projection: dy_i = +(du_trans * h * fy) / (y_img * fx)
+                    dy_i = (du_trans * self.camera_height * self.fy) / (y_img * self.fx)
                     if -0.20 <= dy_i <= 0.20:
                         dy_estimates.append(dy_i)
 
@@ -462,12 +492,13 @@ class VIOOdometryNode(Node):
                 # 2. EKF Measurement Update with Outlier & Rotation Gating
                 pred_vx = self.ekf.x[3]
                 pred_vy = self.ekf.x[4]
-                if abs(current_wz) < 0.50 and abs(v_vio_meas - pred_vx) < 0.60:
-                    self.ekf.update_vio(v_vio_meas, vy_vio_meas, var_vx=0.015, var_vy=0.020)
+                # Gate both forward and lateral velocities and avoid updating during sharp turns
+                if abs(current_wz) < 0.35 and abs(v_vio_meas - pred_vx) < 0.40 and abs(vy_vio_meas - pred_vy) < 0.35:
+                    self.ekf.update_vio(v_vio_meas, vy_vio_meas, var_vx=0.060, var_vy=0.080)
 
             # Re-detect if feature count drops
             if len(good_next) < self.min_features:
-                new_corners = cv2.goodFeaturesToTrack(curr_gray, mask=None, **self.feature_params)
+                new_corners = cv2.goodFeaturesToTrack(curr_gray, mask=floor_mask, **self.feature_params)
                 if new_corners is not None and len(new_corners) > 0:
                     self.prev_pts = new_corners
                 else:
@@ -476,27 +507,28 @@ class VIOOdometryNode(Node):
                 self.prev_pts = good_next.reshape(-1, 1, 2)
         else:
             self.visual_tracking_active = False
-            corners = cv2.goodFeaturesToTrack(curr_gray, mask=None, **self.feature_params)
+            corners = cv2.goodFeaturesToTrack(curr_gray, mask=floor_mask, **self.feature_params)
             if corners is not None and len(corners) > 0:
                 self.prev_pts = corners
 
         self.prev_gray = curr_gray
 
-        # Publish visualization image
-        try:
-            status_text = (
-                f"EKF-VIO: {'ACTIVE' if self.visual_tracking_active else 'SEARCHING'} | "
-                f"Pts: {len(good_prev)} | "
-                f"Pose: ({self.ekf.x[0]:.2f}, {self.ekf.x[1]:.2f}, {math.degrees(self.ekf.x[2]):.1f}deg) | "
-                f"vx: {self.ekf.x[3]:.2f}, vy: {self.ekf.x[4]:.2f}m/s"
-            )
-            cv2.putText(debug_img, status_text, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 2)
-            debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding='bgr8')
-            debug_msg.header.stamp = msg.header.stamp
-            debug_msg.header.frame_id = 'camera_link_optical'
-            self.debug_img_pub.publish(debug_msg)
-        except Exception:
-            pass
+        # Publish visualization image (only if enabled and subscribed)
+        if debug_img is not None:
+            try:
+                status_text = (
+                    f"EKF-VIO: {'ACTIVE' if self.visual_tracking_active else 'SEARCHING'} | "
+                    f"Pts: {len(good_prev)} | "
+                    f"Pose: ({self.ekf.x[0]:.2f}, {self.ekf.x[1]:.2f}, {math.degrees(self.ekf.x[2]):.1f}deg) | "
+                    f"vx: {self.ekf.x[3]:.2f}, vy: {self.ekf.x[4]:.2f}m/s"
+                )
+                cv2.putText(debug_img, status_text, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 2)
+                debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding='bgr8')
+                debug_msg.header.stamp = msg.header.stamp
+                debug_msg.header.frame_id = 'camera_link_optical'
+                self.debug_img_pub.publish(debug_msg)
+            except Exception:
+                pass
 
     def publish_odometry(self, stamp):
         pose_x = float(self.ekf.x[0])

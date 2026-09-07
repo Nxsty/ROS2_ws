@@ -201,13 +201,14 @@ class TrajectoryPlotterNode(Node):
             self.info_text.set_text("\n".join(lines_info))
 
         self.fig.canvas.draw_idle()
-        self.fig.canvas.flush_events()
-
-        self.fig.canvas.draw_idle()
-        self.fig.canvas.flush_events()
+        if not hasattr(self, '_last_save_time'):
+            self._last_save_time = time.time()
+        if time.time() - self._last_save_time > 5.0:
+            self._last_save_time = time.time()
+            self.save_comparison_plot()
 
     def save_comparison_plot(self):
-        output_path = os.path.expanduser('~/ros2_ws/trajectory_comparison.png')
+        output_path = os.path.expanduser('~/ROS2_ws/trajectory_comparison.png')
         self.fig.savefig(output_path, dpi=200, bbox_inches='tight')
         self.get_logger().info(f'📊 Comparison plot saved to: {output_path}')
 
@@ -219,6 +220,7 @@ def main(args=None):
         while rclpy.ok():
             rclpy.spin_once(node, timeout_sec=0.05)
             plt.pause(0.01)
+            time.sleep(0.02)
     except KeyboardInterrupt:
         pass
     finally:

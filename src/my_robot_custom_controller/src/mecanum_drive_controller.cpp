@@ -87,8 +87,8 @@ public:
 
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
 
-        // --- Control loop timer (50 Hz = 20 ms) ---
-        control_timer_ = this->create_wall_timer(
+        // --- Control loop timer (50 Hz = 20 ms) synchronized with sim_time ---
+        control_timer_ = this->create_timer(
             std::chrono::milliseconds(20),
             std::bind(&MecanumDriveController::control_loop, this));
 
