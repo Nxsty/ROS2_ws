@@ -2,6 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 from nav_msgs.msg import Odometry, Path
 import matplotlib
 import matplotlib.pyplot as plt
@@ -25,6 +26,13 @@ class TrajectoryPlotterNode(Node):
 
     def __init__(self):
         super().__init__('trajectory_plotter')
+
+        # Output path parameter (defaults to ~/ros2_ws/trajectory_comparison.png)
+        default_dir = os.path.expanduser('~/ros2_ws')
+        if not os.path.isdir(default_dir):
+            default_dir = os.getcwd()
+        default_path = os.path.join(default_dir, 'trajectory_comparison.png')
+        self.declare_parameter('output_path', default_path)
 
         # Storage for trajectories
         self.gt_x, self.gt_y = [], []
@@ -208,9 +216,25 @@ class TrajectoryPlotterNode(Node):
             self.save_comparison_plot()
 
     def save_comparison_plot(self):
-        output_path = os.path.expanduser('~/ROS2_ws/trajectory_comparison.png')
-        self.fig.savefig(output_path, dpi=200, bbox_inches='tight')
-        self.get_logger().info(f'📊 Comparison plot saved to: {output_path}')
+        try:
+            output_path = os.path.expanduser(
+                self.get_parameter('output_path').get_parameter_value().string_value
+            )
+            output_dir = os.path.dirname(os.path.abspath(output_path))
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            self.fig.savefig(output_path, dpi=200, bbox_inches='tight')
+            msg = f'📊 Comparison plot saved to: {output_path}'
+            if rclpy.ok():
+                self.get_logger().info(msg)
+            else:
+                print(msg)
+        except Exception as e:
+            err_msg = f'Failed to save comparison plot: {e}'
+            if rclpy.ok():
+                self.get_logger().warn(err_msg)
+            else:
+                print(err_msg)
 
 
 def main(args=None):
@@ -221,7 +245,7 @@ def main(args=None):
             rclpy.spin_once(node, timeout_sec=0.05)
             plt.pause(0.01)
             time.sleep(0.02)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.save_comparison_plot()
